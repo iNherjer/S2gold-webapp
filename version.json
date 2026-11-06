@@ -1,5 +1,5 @@
 {
-  "version": "0.4.6",
+  "version": "0.4.7",
   "released": "2026-11-06",
-  "notes": "Delay loading locally stored game ZIP into RAM until pressing Spiel starten to prevent Safari startup crash"
+  "notes": "Load saved js-dos bundle via local blob URL and log startup phase across page reloads"
 }
