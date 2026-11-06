@@ -21,6 +21,26 @@ jobs:
           ref: wasm-main
           path: innoextract-wasm
 
+      - name: Repair upstream Boost archive URL and fail fast
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("innoextract-wasm")
+          deps = root / "utils" / "build_deps.sh"
+          old = "https://boostorg.jfrog.io/artifactory/main/release/1.82.0/source/boost_1_82_0.tar.bz2"
+          new = "https://archives.boost.org/release/1.82.0/source/boost_1_82_0.tar.bz2"
+          s = deps.read_text()
+          assert old in s, "Upstream Boost URL changed – inspect before patching"
+          s = s.replace(old, new)
+          deps.write_text("set -e\\n" + s)
+          build = root / "build.sh"
+          build.write_text("set -e\\n" + build.read_text())
+          print("Patched Boost URL:", new)
+          PY
+          curl -fIL --retry 3 --max-time 60 https://archives.boost.org/release/1.82.0/source/boost_1_82_0.tar.bz2
+
       - name: Build browser target with upstream Dockerfile
         run: |
           docker build --progress=plain -t s2gold-innoextract-wasm ./innoextract-wasm
