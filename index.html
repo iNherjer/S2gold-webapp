@@ -152,7 +152,9 @@ $('#start').disabled=false;
 status(count+' Spieldateien importiert. Speichere Installation lokal …');
 try{
  await storeBundle(zipBytes);
- status(count+' Dateien im Bundle ('+(zipBytes.length/1048576).toFixed(1)+' MiB). Lokal gespeichert; bei künftigen Besuchen automatisch verfügbar.');
+ const savedSizeMiB=(zipBytes.length/1048576).toFixed(1);
+ zipBytes=null;
+ status(count+' Dateien im Bundle ('+savedSizeMiB+' MiB). Lokal gespeichert; die Daten werden erst beim Start direkt aus dem Browserspeicher gelesen.');
 }catch(saveError){
  status(count+' Dateien spielbereit, aber lokale Speicherung fehlgeschlagen: '+saveError.message+'. Beim nächsten Besuch muss die ZIP erneut ausgewählt werden.');
 }
