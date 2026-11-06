@@ -15,16 +15,18 @@ button:disabled{opacity:.45}.primary{background:#d3b36c;color:#12241a;font-weigh
 </style></head><body>
 <header><h1>🏝 Siedler II Gold · iPad Touch Webplayer <small>Experiment v0.1</small></h1></header>
 <main><section class="panel"><p>Lokale Spieldateien auswählen (ZIP der <strong>installierten DOS-Version</strong>). Die GOG-Installer-EXE wird in dieser Version <strong>noch nicht</strong> entpackt. Es werden keine Spieldateien hochgeladen.</p>
-<div class="controls"><label class="upload">📂 Spiel-ZIP<input id="file" type="file" accept=".zip,.jsdos"></label><button class="primary" id="start" disabled>Spiel starten</button><button id="demo">DOS-Test</button><button id="fullscreen">Vollbild</button></div><p id="status" role="status">Bereit. Bitte zuerst „DOS-Test“ ausprobieren.</p></section>
+<div class="controls"><label class="upload">📂 Spiel-ZIP<input id="file" type="file" accept=".zip,.jsdos"></label><label class="upload">🔍 GOG-Installer prüfen<input id="installer" type="file" accept=".exe,application/octet-stream"></label><button class="primary" id="start" disabled>Spiel starten</button><button id="demo">DOS-Test</button><button id="fullscreen">Vollbild</button></div><p id="status" role="status">Bereit. Bitte zuerst „DOS-Test“ ausprobieren.</p></section>
 <div id="stage"><div id="dos"></div><div id="touch"></div></div>
 <section class="panel"><div class="controls"><button data-mouse="0" disabled>Linksklick</button><button data-mouse="2" disabled>Rechtsklick</button><button data-key="256" disabled>Esc</button><button data-key="257" disabled>Enter</button><button data-key="263" disabled>←</button><button data-key="265" disabled>↑</button><button data-key="264" disabled>↓</button><button data-key="262" disabled>→</button><button id="save" disabled>Spielstand sichern</button></div>
 <p><small>Touch-Prototyp: Tippen = linker Mausklick; Drag = Maus bewegen. Die Steuerung und Speicherschnittstelle müssen noch auf dem iPad getestet werden. Für spätere Versionen: direkter GOG-Inno-Setup-Import und lokales Speichern der Installation.</small></p></section></main>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="./installer-check.js"></script>
 <script src="https://v8.js-dos.com/latest/js-dos.js"></script>
 <script>
 (()=>{const $=s=>document.querySelector(s),status=t=>$('#status').textContent=t;
 let zipBytes=null,launch='',player=null,ci=null,pressed=false;
 function config(cmd){return '[sdl]\nfullscreen=false\n[dosbox]\nmachine=svga_s3\nmemsize=32\n[cpu]\ncore=auto\ncycles=auto\n[autoexec]\n@echo off\nc:\n'+cmd+'\n';}
+$('#installer').addEventListener('change',async ev=>{const file=ev.target.files[0];if(!file)return;try{status('GOG-Installer wird lokal geprüft …');const result=await inspectInstaller(file);status(result.message)}catch(error){status('Installer-Prüfung: '+error.message)}});
 $('#file').addEventListener('change',async ev=>{let file=ev.target.files[0];if(!file)return;try{
 status('ZIP wird lokal gelesen …');const source=await JSZip.loadAsync(file);
 const names=Object.keys(source.files).filter(n=>!source.files[n].dir);
