@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -23,12 +24,35 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Stage static frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p site/extractor
+          cp index.html installer-check.js updater.js sw.js version.json .nojekyll site/
+      - name: Download tested WASM build artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p build-artifact
+          gh run download 42251385007 --repo "${{ github.repository }}" --name innoextract-wasm-experimental --dir build-artifact
+          test -s build-artifact/innoextract.wasm
+          test -s build-artifact/innoextract.js
+          test -s build-artifact/index.html
+          cp build-artifact/innoextract.wasm build-artifact/innoextract.js build-artifact/index.html build-artifact/innoextract.html site/extractor/
+          for folder in js css img; do
+            if test -d "build-artifact/$folder"; then cp -R "build-artifact/$folder" site/extractor/; fi
+          done
+          test -s site/extractor/innoextract.wasm
+          echo "Extractor browser assets staged successfully."
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: ./site
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
