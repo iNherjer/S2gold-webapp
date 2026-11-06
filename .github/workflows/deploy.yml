@@ -37,7 +37,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build-artifact
-          RUN_ID=$(gh run list --repo "${{ github.repository }}" --workflow build-innoextract-wasm.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          RUN_DATA=$(gh run list --repo "${{ github.repository }}" --workflow build-innoextract-wasm.yml --branch main --status success --limit 1 --json databaseId,headSha)
+          RUN_ID=$(echo "$RUN_DATA" | jq -r '.[0].databaseId // empty')
+          RUN_SHA=$(echo "$RUN_DATA" | jq -r '.[0].headSha // empty')
+          if [[ "$RUN_SHA" == "d8ea06e17d1f931e3295b27b84c4fb7a302dbc74" ]]; then
+            echo "::warning::Only the OLD unpatched ZIP exporter build is available. Skipping outdated extractor."
+            exit 0
+          fi
           if [[ -z "$RUN_ID" ]]; then
             echo "::warning::No successful WASM run available; publishing diagnostic fallback."
             exit 0
