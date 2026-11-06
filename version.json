@@ -1,5 +1,5 @@
 {
-  "version": "0.4.1",
+  "version": "0.4.2",
   "released": "2026-11-06",
-  "notes": "ZIP integrity diagnostics; WASM extractor output flush fix pending rebuild"
+  "notes": "Build valid js-dos game archive and mount C:; startup diagnostics"
 }
