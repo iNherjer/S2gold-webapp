@@ -25,3 +25,18 @@ Erwartete Adresse: https://inherjer.github.io/S2gold-webapp/
 2. DOSBox-Laufzeit und Spielstart mit dem GOG-Build 30319 validieren.
 3. iPad-Maus/Touch-Koordinaten und Bedienung optimieren.
 4. Installation und Spielstände lokal persistieren.
+
+
+## Experiment: Innoextract WebAssembly Build
+
+The separate [Build Innoextract WebAssembly workflow](../../actions/workflows/build-innoextract-wasm.yml)
+attempts to build the existing `Mobica/innoextract-wasm` fork at `wasm-main` in its own Docker toolchain.
+
+**Important:** The build is experimental and has not been verified to succeed. The fork relies on
+older Emscripten and externally hosted Boost tarballs that may no longer be available.
+The workflow **never** includes or uploads proprietary GOG installers. It publishes a temporary
+Actions *artifact*, not a Pages deployment. The shipped browser UI currently only **inspects**
+the .exe; a successful build and real-world extraction tests are required before enabling import.
+
+Run it via Actions → Build Innoextract WebAssembly → Run workflow. If it fails, inspect the
+first failing step's logs. On success inspect the downloaded artifact for browser integration.
