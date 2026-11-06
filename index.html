@@ -13,14 +13,14 @@ button:disabled{opacity:.45}.primary{background:#d3b36c;color:#12241a;font-weigh
 #status{white-space:pre-wrap;color:#e8cd85;font-size:13px;min-height:2em;margin:10px 0}small{color:#b3c9b8}
 @media(orientation:landscape){main{max-width:100%;padding:7px}#stage{max-height:63dvh}}
 </style></head><body>
-<header><h1>🏝 Siedler II Gold · iPad Touch Webplayer <small>Experiment v0.4.1</small></h1></header>
+<header><h1>🏝 Siedler II Gold · iPad Touch Webplayer <small>Experiment v0.4.2</small></h1></header>
 <main><section class="panel"><p>Lokale Spieldateien auswählen (ZIP der <strong>installierten DOS-Version</strong>). Die direkte EXE-Extraktion ist jetzt <strong>auf einer separaten Testseite</strong> verfügbar, jedoch noch nicht mit dem Spielstart verbunden. Es werden keine Spieldateien hochgeladen.</p>
-<div class="controls"><label class="upload">📂 Spiel-ZIP<input id="file" type="file" accept=".zip,.jsdos"></label><label class="upload">🔍 GOG-Installer prüfen<input id="installer" type="file" accept=".exe,application/octet-stream"></label><button class="primary" id="start" disabled>Spiel starten</button><button id="demo">DOS-Test</button><button id="fullscreen">Vollbild</button><button id="checkUpdate">↻ Updates prüfen</button><button id="extractorTest">🧪 EXE-Extractor testen</button></div><p id="updateStatus" role="status"><small>Webplayer v0.4.1 – Updateprüfung wird vorbereitet.</small></p><p id="status" role="status">Bereit. Bitte zuerst „DOS-Test“ ausprobieren.</p></section>
+<div class="controls"><label class="upload">📂 Spiel-ZIP<input id="file" type="file" accept=".zip,.jsdos"></label><label class="upload">🔍 GOG-Installer prüfen<input id="installer" type="file" accept=".exe,application/octet-stream"></label><button class="primary" id="start" disabled>Spiel starten</button><button id="demo">DOS-Test</button><button id="fullscreen">Vollbild</button><button id="checkUpdate">↻ Updates prüfen</button><button id="extractorTest">🧪 EXE-Extractor testen</button></div><p id="updateStatus" role="status"><small>Webplayer v0.4.2 – Updateprüfung wird vorbereitet.</small></p><p id="status" role="status">Bereit. Bitte zuerst „DOS-Test“ ausprobieren.</p></section>
 <div id="stage"><div id="dos"></div><div id="touch"></div></div>
 <section class="panel"><div class="controls"><button data-mouse="0" disabled>Linksklick</button><button data-mouse="2" disabled>Rechtsklick</button><button data-key="256" disabled>Esc</button><button data-key="257" disabled>Enter</button><button data-key="263" disabled>←</button><button data-key="265" disabled>↑</button><button data-key="264" disabled>↓</button><button data-key="262" disabled>→</button><button id="save" disabled>Spielstand sichern</button></div>
 <p><small>Touch-Prototyp: Tippen = linker Mausklick; Drag = Maus bewegen. Die Steuerung und Speicherschnittstelle müssen noch auf dem iPad getestet werden. Für spätere Versionen: direkter GOG-Inno-Setup-Import und lokales Speichern der Installation.</small></p></section></main>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="./installer-check.js?v=0.4.1"></script>
+<script src="./installer-check.js?v=0.4.2"></script>
 <script src="https://v8.js-dos.com/latest/js-dos.js"></script>
 <script>
 (()=>{const $=s=>document.querySelector(s),status=t=>$('#status').textContent=t;
@@ -44,12 +44,22 @@ const names=Object.keys(source.files).filter(n=>!source.files[n].dir);
 const exe=names.find(n=>/(^|\/)(SIEDLER2|SETTLER2|S2)\.EXE$/i.test(n));
 if(!exe)throw Error('Keine S2.EXE / SIEDLER2.EXE / SETTLER2.EXE gefunden. Bitte die installierten DOS-Dateien zippen.');
 const prefix=exe.substring(0,exe.lastIndexOf('/')+1),out=new JSZip();let count=0;
-for(const name of names){if(!name.startsWith(prefix))continue;const relative=name.slice(prefix.length);if(!relative||relative.startsWith('.jsdos/'))continue;out.file(relative,source.files[name].async('uint8array'));count++;}
-zipBytes=new Uint8Array(await out.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:1}}));launch=exe.slice(prefix.length).replaceAll('/','\\');$('#start').disabled=false;
-status(count+' Dateien gefunden. Bereit für „Spiel starten“.');
+launch=exe.slice(prefix.length).replaceAll('/','\\');
+out.file('.jsdos/dosbox.conf',config(launch));
+for(const name of names){
+ if(!name.startsWith(prefix))continue;
+ const relative=name.slice(prefix.length);
+ if(!relative||relative.startsWith('.jsdos/'))continue;
+ out.file(relative,source.files[name].async('uint8array'));count++;
+}
+status(count+' Spieldateien erkannt. Erstelle js-dos-Bundle …');
+zipBytes=new Uint8Array(await out.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:1},streamFiles:true}));
+$('#start').disabled=false;
+status(count+' Dateien im js-dos-Bundle ('+(zipBytes.length/1048576).toFixed(1)+' MiB). Bereit für „Spiel starten“.');
 }catch(e){zipBytes=null;$('#start').disabled=true;status('Importfehler: '+e.message);}});
-async function boot(demo){try{if(player){await player.stop();player=null;ci=null;}$('#dos').replaceChildren();$('#touch').style.display='none';status('DOSBox startet …');
-player=Dos($('#dos'),{dosboxConf:config(demo?'ver':launch),autoStart:true,backend:'dosbox',backendLocked:true,renderAspect:'4/3',imageRendering:'pixelated',mouseCapture:false,workerThread:true,autoSave:true,initFs:demo?undefined:zipBytes,onEvent:(event,arg)=>{if(event==='ci-ready'){ci=arg;document.querySelectorAll('[data-mouse],[data-key],#save').forEach(b=>b.disabled=false);$('#touch').style.display='block';status(demo?'DOS-Test läuft.':'Emulator läuft – Spielstart wird geprüft.');}}});
+async function boot(demo){try{if(player){await player.stop();player=null;ci=null;}$('#dos').replaceChildren();$('#touch').style.display='none';status('DOSBox startet … '+(demo?'DOS-Test':((zipBytes?.length||0)/1048576).toFixed(1)+' MiB Spieldaten'));
+if(!demo&&!zipBytes)throw Error('Kein DOS-Bundle geladen.');
+player=Dos($('#dos'),{dosboxConf:config(demo?'ver':launch),autoStart:true,backend:'dosbox',backendLocked:true,renderAspect:'4/3',imageRendering:'pixelated',mouseCapture:false,workerThread:true,autoSave:true,initFs:demo?undefined:zipBytes,onEvent:(event,arg)=>{if(event==='error'||event==='ci-error')status('DOSBox-Fehler: '+String(arg));if(event==='ci-ready'){ci=arg;document.querySelectorAll('[data-mouse],[data-key],#save').forEach(b=>b.disabled=false);$('#touch').style.display='block';status(demo?'DOS-Test läuft.':'Emulator läuft – Spielstart wird geprüft.');}}});
 }catch(e){status('Startfehler: '+e.message);}}
 $('#demo').onclick=()=>boot(true);$('#start').onclick=()=>boot(false);
 $('#fullscreen').onclick=()=>{const el=$('#stage');if(el.requestFullscreen)el.requestFullscreen().catch(e=>status(e.message));else status('Vollbild wird hier nicht unterstützt.');};
@@ -62,4 +72,4 @@ document.querySelectorAll('[data-mouse]').forEach(b=>b.onclick=async()=>{if(!ci)
 document.querySelectorAll('[data-key]').forEach(b=>b.onclick=async()=>{if(!ci)return;const k=Number(b.dataset.key);try{await ci.sendKeyEvent(k,true);await ci.sendKeyEvent(k,false)}catch(e){status(e.message)}});
 $('#save').onclick=async()=>{if(!ci)return;try{await ci.persist();status('Speicheranfrage gesendet. Wiederherstellung noch nicht verifiziert.')}catch(e){status('Speicherfehler: '+e.message)}};
 })();
-</script><script src="./updater.js?v=0.4.1"></script><script>document.getElementById('extractorTest').addEventListener('click',()=>{window.location.href='./extractor/index.html';});</script></body></html>
+</script><script src="./updater.js?v=0.4.2"></script><script>document.getElementById('extractorTest').addEventListener('click',()=>{window.location.href='./extractor/index.html';});</script></body></html>
