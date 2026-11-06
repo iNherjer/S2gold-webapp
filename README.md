@@ -40,3 +40,10 @@ the .exe; a successful build and real-world extraction tests are required before
 
 Run it via Actions → Build Innoextract WebAssembly → Run workflow. If it fails, inspect the
 first failing step's logs. On success inspect the downloaded artifact for browser integration.
+
+
+## v0.4.0: separate extractor testing
+
+The GitHub Pages deployment downloads the previously successfully built `innoextract-wasm-experimental` artifact from Actions run `42251385007` and serves its browser UI at `/S2gold-webapp/extractor/index.html`. The main game player is unchanged. This is an **experimental extractor UI**, not yet a direct game launch. The extraction workflow has **not** yet been tested on iPad or with the GOG installer. No proprietary game content is committed to the repository.
+
+Note: deployment currently depends on this time-limited GitHub Actions artifact, expiring 2026-11-20. Replace with reproducible packaging or a maintained release before expiry.
