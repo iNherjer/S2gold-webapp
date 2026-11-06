@@ -13,14 +13,14 @@ button:disabled{opacity:.45}.primary{background:#d3b36c;color:#12241a;font-weigh
 #status{white-space:pre-wrap;color:#e8cd85;font-size:13px;min-height:2em;margin:10px 0}small{color:#b3c9b8}
 @media(orientation:landscape){main{max-width:100%;padding:7px}#stage{max-height:63dvh}}
 </style></head><body>
-<header><h1>🏝 Siedler II Gold · iPad Touch Webplayer <small>Experiment v0.4.0</small></h1></header>
+<header><h1>🏝 Siedler II Gold · iPad Touch Webplayer <small>Experiment v0.4.1</small></h1></header>
 <main><section class="panel"><p>Lokale Spieldateien auswählen (ZIP der <strong>installierten DOS-Version</strong>). Die direkte EXE-Extraktion ist jetzt <strong>auf einer separaten Testseite</strong> verfügbar, jedoch noch nicht mit dem Spielstart verbunden. Es werden keine Spieldateien hochgeladen.</p>
-<div class="controls"><label class="upload">📂 Spiel-ZIP<input id="file" type="file" accept=".zip,.jsdos"></label><label class="upload">🔍 GOG-Installer prüfen<input id="installer" type="file" accept=".exe,application/octet-stream"></label><button class="primary" id="start" disabled>Spiel starten</button><button id="demo">DOS-Test</button><button id="fullscreen">Vollbild</button><button id="checkUpdate">↻ Updates prüfen</button><button id="extractorTest">🧪 EXE-Extractor testen</button></div><p id="updateStatus" role="status"><small>Webplayer v0.4.0 – Updateprüfung wird vorbereitet.</small></p><p id="status" role="status">Bereit. Bitte zuerst „DOS-Test“ ausprobieren.</p></section>
+<div class="controls"><label class="upload">📂 Spiel-ZIP<input id="file" type="file" accept=".zip,.jsdos"></label><label class="upload">🔍 GOG-Installer prüfen<input id="installer" type="file" accept=".exe,application/octet-stream"></label><button class="primary" id="start" disabled>Spiel starten</button><button id="demo">DOS-Test</button><button id="fullscreen">Vollbild</button><button id="checkUpdate">↻ Updates prüfen</button><button id="extractorTest">🧪 EXE-Extractor testen</button></div><p id="updateStatus" role="status"><small>Webplayer v0.4.1 – Updateprüfung wird vorbereitet.</small></p><p id="status" role="status">Bereit. Bitte zuerst „DOS-Test“ ausprobieren.</p></section>
 <div id="stage"><div id="dos"></div><div id="touch"></div></div>
 <section class="panel"><div class="controls"><button data-mouse="0" disabled>Linksklick</button><button data-mouse="2" disabled>Rechtsklick</button><button data-key="256" disabled>Esc</button><button data-key="257" disabled>Enter</button><button data-key="263" disabled>←</button><button data-key="265" disabled>↑</button><button data-key="264" disabled>↓</button><button data-key="262" disabled>→</button><button id="save" disabled>Spielstand sichern</button></div>
 <p><small>Touch-Prototyp: Tippen = linker Mausklick; Drag = Maus bewegen. Die Steuerung und Speicherschnittstelle müssen noch auf dem iPad getestet werden. Für spätere Versionen: direkter GOG-Inno-Setup-Import und lokales Speichern der Installation.</small></p></section></main>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="./installer-check.js?v=0.4.0"></script>
+<script src="./installer-check.js?v=0.4.1"></script>
 <script src="https://v8.js-dos.com/latest/js-dos.js"></script>
 <script>
 (()=>{const $=s=>document.querySelector(s),status=t=>$('#status').textContent=t;
@@ -28,7 +28,18 @@ let zipBytes=null,launch='',player=null,ci=null,pressed=false;
 function config(cmd){return '[sdl]\nfullscreen=false\n[dosbox]\nmachine=svga_s3\nmemsize=32\n[cpu]\ncore=auto\ncycles=auto\n[autoexec]\n@echo off\nc:\n'+cmd+'\n';}
 $('#installer').addEventListener('change',async ev=>{const file=ev.target.files[0];if(!file)return;try{status('GOG-Installer wird lokal geprüft …');const result=await inspectInstaller(file);status(result.message)}catch(error){status('Installer-Prüfung: '+error.message)}});
 $('#file').addEventListener('change',async ev=>{let file=ev.target.files[0];if(!file)return;try{
-status('ZIP wird lokal gelesen …');const source=await JSZip.loadAsync(file);
+status('ZIP wird lokal geprüft …');
+const header=new Uint8Array(await file.slice(0,4).arrayBuffer());
+const magic=Array.from(header,b=>b.toString(16).padStart(2,'0')).join(' ');
+if(!(header[0]===0x50&&header[1]===0x4b&&header[2]===0x03&&header[3]===0x04)){
+  throw Error('Datei ist kein reguläres ZIP (Anfang: '+magic+', erwartet 50 4b 03 04). Bitte mit dem neu gebauten Extractor erneut entpacken. Dateigröße: '+(file.size/1048576).toFixed(1)+' MiB.');
+}
+const tail=new Uint8Array(await file.slice(Math.max(0,file.size-65557)).arrayBuffer());
+let eocd=false;
+for(let i=tail.length-22;i>=0;i--){if(tail[i]===0x50&&tail[i+1]===0x4b&&tail[i+2]===0x05&&tail[i+3]===0x06){eocd=true;break;}}
+if(!eocd)throw Error('ZIP-Endverzeichnis fehlt. Der Export ist wahrscheinlich unvollständig – bitte nach dem Extractor-Update erneut exportieren.');
+status('ZIP-Struktur erkannt. Dateien werden eingelesen …');
+const source=await JSZip.loadAsync(file);
 const names=Object.keys(source.files).filter(n=>!source.files[n].dir);
 const exe=names.find(n=>/(^|\/)(SIEDLER2|SETTLER2|S2)\.EXE$/i.test(n));
 if(!exe)throw Error('Keine S2.EXE / SIEDLER2.EXE / SETTLER2.EXE gefunden. Bitte die installierten DOS-Dateien zippen.');
@@ -51,4 +62,4 @@ document.querySelectorAll('[data-mouse]').forEach(b=>b.onclick=async()=>{if(!ci)
 document.querySelectorAll('[data-key]').forEach(b=>b.onclick=async()=>{if(!ci)return;const k=Number(b.dataset.key);try{await ci.sendKeyEvent(k,true);await ci.sendKeyEvent(k,false)}catch(e){status(e.message)}});
 $('#save').onclick=async()=>{if(!ci)return;try{await ci.persist();status('Speicheranfrage gesendet. Wiederherstellung noch nicht verifiziert.')}catch(e){status('Speicherfehler: '+e.message)}};
 })();
-</script><script src="./updater.js?v=0.4.0"></script><script>document.getElementById('extractorTest').addEventListener('click',()=>{window.location.href='./extractor/index.html';});</script></body></html>
+</script><script src="./updater.js?v=0.4.1"></script><script>document.getElementById('extractorTest').addEventListener('click',()=>{window.location.href='./extractor/index.html';});</script></body></html>
