@@ -1,5 +1,5 @@
 {
-  "version": "0.4.2",
+  "version": "0.4.3",
   "released": "2026-11-06",
-  "notes": "Build valid js-dos game archive and mount C:; startup diagnostics"
+  "notes": "DOS startup diagnostic batch prints directory and missing executable details"
 }
