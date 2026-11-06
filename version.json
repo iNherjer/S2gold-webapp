@@ -1,5 +1,5 @@
 {
-  "version": "0.4.8",
+  "version": "0.4.9",
   "released": "2026-11-06",
-  "notes": "Standalone crash diagnostics page and persistent startup trace; no game assets loaded in diagnostics"
+  "notes": "Block 295 MiB in-RAM emulator launches and record OPFS save/restore errors in diagnostics"
 }
