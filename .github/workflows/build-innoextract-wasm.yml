@@ -133,8 +133,8 @@ jobs:
           a = s.index("EM_JS(void, open_int,")
           b = s.index("EM_ASYNC_JS(void, abort_int,", a)
           replacement = """EM_JS(void, open_int, (const char *name, const char *modes, uint64_t output_size), {
-            const rawName = UTF8ToString(name).split(/[\\\\/]/).pop();
-            Module.zipName = /\\\\.zip$/i.test(rawName) ? rawName : rawName + ".zip";
+            const rawName = UTF8ToString(name).split("/").pop();
+            Module.zipName = rawName.toLowerCase().endsWith(".zip") ? rawName : rawName + ".zip";
             Module.writer = null;
             Module.zipError = null;
             const old = document.getElementById("s2gold-download");
