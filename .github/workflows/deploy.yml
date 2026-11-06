@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p site/extractor
-          cp index.html installer-check.js updater.js sw.js version.json .nojekyll site/
+          cp index.html diagnostics.html installer-check.js updater.js sw.js version.json .nojekyll site/
           if test -f extractor/index.html; then cp extractor/index.html site/extractor/index.html; fi
       - name: Bundle newest successful WASM extractor
         shell: bash
