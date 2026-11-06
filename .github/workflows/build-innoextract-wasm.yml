@@ -122,6 +122,94 @@ jobs:
           PY
 
 
+      - name: Use iOS local-file ZIP export with explicit download button
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("innoextract-wasm/src/wasm/emjs.cpp")
+          s = p.read_text()
+          a = s.index("EM_JS(void, open_int,")
+          b = s.index("EM_ASYNC_JS(void, abort_int,", a)
+          replacement = """EM_JS(void, open_int, (const char *name, const char *modes, uint64_t output_size), {
+            const rawName = UTF8ToString(name).split(/[\\\\/]/).pop();
+            Module.zipName = /\\\\.zip$/i.test(rawName) ? rawName : rawName + ".zip";
+            Module.writer = null;
+            Module.zipError = null;
+            const old = document.getElementById("s2gold-download");
+            if (old) old.remove();
+            Module.zipQueue = navigator.storage.getDirectory()
+              .then(root => root.getFileHandle("s2gold-export.zip", {create:true}))
+              .then(handle => { Module.zipFileHandle = handle; return handle.createWritable(); })
+              .then(writer => { Module.writer = writer; innoLog("OPFS ZIP writer ready"); });
+            Module.zipQueue.catch(err => {
+              Module.zipError = String(err);
+              console.error("OPFS initialization failed", err);
+              document.getElementById("status").textContent = "ZIP-Speicherfehler: " + err;
+            });
+          });
+          
+          EM_JS(void, write_int, (const void *ptr, size_t size, size_t n), {
+            const bytes = new Uint8Array(Module.HEAPU8.buffer, ptr, size*n).slice();
+            Module.zipPendingBytes = (Module.zipPendingBytes || 0) + bytes.byteLength;
+            Module.zipQueue = Module.zipQueue.then(async () => {
+              try { await Module.writer.write(bytes); }
+              finally { Module.zipPendingBytes -= bytes.byteLength; }
+            });
+            Module.zipQueue.catch(err => {
+              Module.zipError = String(err);
+              console.error("OPFS ZIP write failed", err);
+            });
+          });
+          
+          EM_JS(void, close_int, (void), {
+            Module.zipQueue = Module.zipQueue.then(async () => {
+              if (!Module.writer || !Module.zipFileHandle) throw new Error("ZIP-Writer fehlt");
+              await Module.writer.close();
+              const file = await Module.zipFileHandle.getFile();
+              if (file.size < 22) throw new Error("ZIP unvollständig: nur " + file.size + " Bytes");
+              const head = new Uint8Array(await file.slice(0,4).arrayBuffer());
+              if (head[0] !== 0x50 || head[1] !== 0x4b || head[2] !== 0x03 || head[3] !== 0x04)
+                throw new Error("ZIP-Dateianfang ungültig");
+              const tail = new Uint8Array(await file.slice(Math.max(0, file.size-65557)).arrayBuffer());
+              let found = false;
+              for (let i=tail.length-22; i>=0; i--) {
+                if (tail[i]===0x50 && tail[i+1]===0x4b && tail[i+2]===0x05 && tail[i+3]===0x06) {
+                  found=true; break;
+                }
+              }
+              if (!found) throw new Error("ZIP-Endverzeichnis fehlt");
+              if (Module.zipDownloadUrl) URL.revokeObjectURL(Module.zipDownloadUrl);
+              Module.zipDownloadUrl = URL.createObjectURL(file);
+              const link = document.createElement("a");
+              link.id = "s2gold-download";
+              link.href = Module.zipDownloadUrl;
+              link.download = Module.zipName || "s2gold-export.zip";
+              link.textContent = "⬇ ZIP herunterladen (" + (file.size/1048576).toFixed(1) + " MiB)";
+              link.style.cssText = "display:block;position:fixed;z-index:99999;bottom:16%;left:6%;right:6%;padding:18px;background:#f5c84b;color:#141a14;text-align:center;font:bold 19px system-ui;border-radius:13px;box-shadow:0 6px 30px #0009";
+              document.body.appendChild(link);
+              innoLog("OPFS ZIP validated; user download available");
+              const status = document.getElementById("status");
+              if (status) status.textContent = "ZIP fertig. Jetzt den gelben Download-Knopf antippen.";
+            }).catch(err => {
+              Module.zipError = String(err);
+              console.error("OPFS ZIP finalization failed", err);
+              const status = document.getElementById("status");
+              if (status) status.textContent = "ZIP-Export fehlgeschlagen: " + err;
+              const warning = document.createElement("div");
+              warning.style.cssText = "position:fixed;z-index:99999;bottom:15%;left:5%;right:5%;padding:20px;background:#921c28;color:white;font:16px system-ui;border-radius:12px";
+              warning.textContent = "ZIP-Export fehlgeschlagen: " + err;
+              document.body.appendChild(warning);
+            });
+          });
+          
+          """
+          s = s[:a] + replacement + s[b:]
+          p.write_text(s)
+          print("Replaced StreamSaver with OPFS ZIP writer plus explicit download link")
+          PY
+
       - name: Build browser target with upstream Dockerfile
         run: |
           docker build --progress=plain -t s2gold-innoextract-wasm ./innoextract-wasm
