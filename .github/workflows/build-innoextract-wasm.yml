@@ -88,6 +88,40 @@ jobs:
           print("Patched sequential asynchronous writer queue and final buffer flush")
           PY
 
+      - name: Bound ZIP buffering and reduce startup memory for Safari
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("innoextract-wasm/src/wasm/emjs.cpp")
+          s = p.read_text()
+          original = "char buff[64 * 1024 * 1024];"
+          assert original in s
+          s = s.replace(original, "char buff[2 * 1024 * 1024];", 1)
+          original = "Module.zipQueue = (Module.zipQueue || Promise.resolve()).then(() => Module.writer.write(bytes));"
+          replacement = "Module.zipPendingBytes = (Module.zipPendingBytes || 0) + bytes.byteLength;" + chr(10) + "  Module.zipQueue = (Module.zipQueue || Promise.resolve()).then(async () => { try { await Module.writer.write(bytes); } finally { Module.zipPendingBytes -= bytes.byteLength; } });"
+          assert original in s
+          s = s.replace(original, replacement, 1)
+          original = "    write_int(buff, 1, bpos);"
+          replacement = original + chr(10) + "    while (EM_ASM_INT({ return Module.zipPendingBytes || 0; }) > 8 * 1024 * 1024) { emscripten_sleep(10); }"
+          assert original in s
+          s = s.replace(original, replacement)
+          original = "Module.zipQueue = Promise.resolve(); Module.zipError = null;"
+          replacement = original + " Module.zipPendingBytes = 0;"
+          assert original in s
+          s = s.replace(original, replacement, 1)
+          p.write_text(s)
+          cmake = Path("innoextract-wasm/CMakeLists.txt")
+          c = cmake.read_text()
+          original = "-sINITIAL_MEMORY=1024MB -sSTACK_SIZE=512MB"
+          assert original in c
+          c = c.replace(original, "-sINITIAL_MEMORY=768MB -sSTACK_SIZE=64MB", 1)
+          cmake.write_text(c)
+          print("ZIP buffer 2 MiB, queue backpressure 8 MiB, WASM initial 768 MiB, stack 64 MiB")
+          PY
+
+
       - name: Build browser target with upstream Dockerfile
         run: |
           docker build --progress=plain -t s2gold-innoextract-wasm ./innoextract-wasm
