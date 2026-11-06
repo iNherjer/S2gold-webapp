@@ -40,13 +40,13 @@ jobs:
           RUN_DATA=$(gh run list --repo "${{ github.repository }}" --workflow build-innoextract-wasm.yml --branch main --status success --limit 1 --json databaseId,headSha)
           RUN_ID=$(echo "$RUN_DATA" | jq -r '.[0].databaseId // empty')
           RUN_SHA=$(echo "$RUN_DATA" | jq -r '.[0].headSha // empty')
-          if [[ "$RUN_SHA" == "d8ea06e17d1f931e3295b27b84c4fb7a302dbc74" ]]; then
-            echo "::warning::Only the OLD unpatched ZIP exporter build is available. Skipping outdated extractor."
-            exit 0
-          fi
           if [[ -z "$RUN_ID" ]]; then
-            echo "::warning::No successful WASM run available; publishing diagnostic fallback."
-            exit 0
+            echo "::error::No successful WASM build is available."
+            exit 1
+          fi
+          if [[ "$RUN_SHA" == "d8ea06e17d1f931e3295b27b84c4fb7a302dbc74" ]]; then
+            echo "::error::The latest successful WASM build is the known-broken old ZIP exporter."
+            exit 1
           fi
           echo "WASM build run: $RUN_ID"
           if gh run download "$RUN_ID" --repo "${{ github.repository }}" --name innoextract-wasm-experimental --dir build-artifact \
@@ -58,10 +58,11 @@ jobs:
             for folder in js css img; do
               if test -d "build-artifact/$folder"; then cp -R "build-artifact/$folder" site/extractor/; fi
             done
-            echo "$RUN_ID" > site/extractor/build-id.txt
+            printf 'run=%s\ncommit=%s\n' "$RUN_ID" "$RUN_SHA" > site/extractor/build-id.txt
             echo "Bundled WASM build $RUN_ID"
           else
-            echo "::warning::Could not download WASM build $RUN_ID; publishing diagnostic fallback."
+            echo "::error::Could not download WASM build $RUN_ID; refusing to publish a misleading extractor page."
+            exit 1
           fi
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
