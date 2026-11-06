@@ -68,10 +68,18 @@ jobs:
           
           """
           s = s[:start] + new + s[end:]
-          needle = "void close() {\\n  close_int();\\n}"
-          replacement = "void close() {\\n  if (bpos > 0) {\\n    write_int(buff, 1, bpos);\\n    bpos = 0;\\n  }\\n  close_int();\\n}"
-          assert needle in s, "Close implementation changed upstream"
-          s = s.replace(needle, replacement, 1)
+          import re
+          replacement = chr(10).join([
+              "void close() {",
+              "  if (bpos > 0) {",
+              "    write_int(buff, 1, bpos);",
+              "    bpos = 0;",
+              "  }",
+              "  close_int();",
+              "}"
+          ])
+          s, changes = re.subn(r"void close\(\)\s*\{\s*close_int\(\);\s*\}", lambda _: replacement, s, count=1)
+          assert changes == 1, "Close implementation changed upstream"
           needle2 = "  bpos = 0; // Reset output buffer"
           replace2 = "  bpos = 0; // Reset output buffer\\n  EM_ASM({ Module.zipQueue = Promise.resolve(); Module.zipError = null; });"
           assert needle2 in s
