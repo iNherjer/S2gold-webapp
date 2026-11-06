@@ -41,24 +41,43 @@ jobs:
           PY
           curl -fIL --retry 3 --max-time 60 https://archives.boost.org/release/1.82.0/source/boost_1_82_0.tar.bz2
 
-      - name: Patch streaming ZIP export and preserve final buffer
+      - name: Patch ZIP output with ordered nonblocking stream writes
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          path = Path("innoextract-wasm/src/wasm/emjs.cpp")
-          s = path.read_text()
-          def patch(old, new, label):
-              global s
-              assert old in s, "Upstream source changed: " + label
-              s = s.replace(old, new, 1)
-          patch("EM_JS(void, close_int, (void), {", "EM_ASYNC_JS(void, close_int, (void), {", "async close signature")
-          patch("Module.writer.close();", "await Module.writer.close();", "await writer close")
-          patch("new Uint8Array(Module.HEAPU8.buffer, ptr, size*n);", "new Uint8Array(Module.HEAPU8.buffer, ptr, size*n).slice();", "copy stream buffer")
-          patch("void close() {\n  close_int();\n}", "void close() {\n  if (bpos > 0) {\n    write_int(buff, 1, bpos);\n    bpos = 0;\n  }\n  close_int();\n}", "final buffered ZIP data")
-          path.write_text(s)
-          print("WASM streaming ZIP export patched successfully")
+          p = Path("innoextract-wasm/src/wasm/emjs.cpp")
+          s = p.read_text()
+          start = s.index("EM_ASYNC_JS(size_t, write_int,")
+          end = s.index("EM_ASYNC_JS(void, abort_int,", start)
+          new = """EM_JS(void, write_int, (const void *ptr, size_t size, size_t n), {
+            const bytes = new Uint8Array(Module.HEAPU8.buffer, ptr, size*n).slice();
+            Module.zipQueue = (Module.zipQueue || Promise.resolve()).then(() => Module.writer.write(bytes));
+            Module.zipQueue.catch(e => { Module.zipError = String(e); console.error("ZIP write failed", e); });
+          });
+          
+          EM_JS(void, close_int, (void), {
+            Module.zipQueue = (Module.zipQueue || Promise.resolve()).then(async () => {
+              if (!Module.writer) throw new Error("ZIP writer missing");
+              await Module.writer.close();
+              innoLog("zipstream: close completed");
+            });
+            Module.zipQueue.catch(e => { Module.zipError = String(e); console.error("ZIP close failed", e); });
+          });
+          
+          """
+          s = s[:start] + new + s[end:]
+          needle = "void close() {\\n  close_int();\\n}"
+          replacement = "void close() {\\n  if (bpos > 0) {\\n    write_int(buff, 1, bpos);\\n    bpos = 0;\\n  }\\n  close_int();\\n}"
+          assert needle in s, "Close implementation changed upstream"
+          s = s.replace(needle, replacement, 1)
+          needle2 = "  bpos = 0; // Reset output buffer"
+          replace2 = "  bpos = 0; // Reset output buffer\\n  EM_ASM({ Module.zipQueue = Promise.resolve(); Module.zipError = null; });"
+          assert needle2 in s
+          s = s.replace(needle2, replace2, 1)
+          p.write_text(s)
+          print("Patched sequential asynchronous writer queue and final buffer flush")
           PY
 
       - name: Build browser target with upstream Dockerfile
