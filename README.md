@@ -2,7 +2,7 @@
 
 Experimenteller Browser-Webplayer für **Siedler II Gold** mit js-dos 8 und iPad-Touch-Eingaben.
 
-## Status
+## Status\n- EXE-Prüfung: Datei- und Signaturkontrolle lokal im Browser (ohne Entpackung und ohne Upload).
 - GitHub-Pages-Grundgerüst und lokaler ZIP-Import der **installierten DOS-Dateien**.
 - DOSBox-Test und Spielstart sind **noch nicht auf einem iPad verifiziert**.
 - **Der direkte Import der GOG-Inno-Setup-EXE funktioniert noch nicht.** Das ist der nächste Arbeitsschritt.
