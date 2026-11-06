@@ -1,8 +1,8 @@
-/* S2Gold updater v0.3.1. Only reload after user confirmation.
+/* S2Gold updater v0.4.0. Only reload after user confirmation.
    Network-first HTML and a no-store version manifest avoid stale Safari installs.
 */
 (() => {
- const VERSION='0.3.1';
+ const VERSION='0.4.0';
  const element=document.querySelector('#updateStatus');
  const button=document.querySelector('#checkUpdate');
  const label=(message)=>{if(element)element.textContent=message;};
