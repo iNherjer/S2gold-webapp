@@ -25,7 +25,7 @@ button:disabled{opacity:.45}.primary{background:#d3b36c;color:#12241a;font-weigh
 <script>
 (()=>{const $=s=>document.querySelector(s),status=t=>$('#status').textContent=t;
 let zipBytes=null,launch='',player=null,ci=null,pressed=false;
-function config(cmd){return '[sdl]\nfullscreen=false\n[dosbox]\nmachine=svga_s3\nmemsize=32\n[cpu]\ncore=auto\ncycles=auto\n[autoexec]\n@echo off\nc:\n'+cmd+'\n';}
+function config(cmd){return '[sdl]\nfullscreen=false\n[dosbox]\nmachine=svga_s3\nmemsize=32\n[cpu]\ncore=auto\ncycles=auto\n[autoexec]\n@echo off\nmount c .\nc:\n'+cmd+'\n';}
 $('#installer').addEventListener('change',async ev=>{const file=ev.target.files[0];if(!file)return;try{status('GOG-Installer wird lokal geprüft …');const result=await inspectInstaller(file);status(result.message)}catch(error){status('Installer-Prüfung: '+error.message)}});
 $('#file').addEventListener('change',async ev=>{let file=ev.target.files[0];if(!file)return;try{
 status('ZIP wird lokal geprüft …');
