@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.3.1",
   "released": "2026-11-06",
-  "notes": "Service Worker / Safari update control; EXE diagnostics only"
+  "notes": "Cache version bump to force new GitHub Pages deploy; EXE extraction remains unimplemented"
 }
