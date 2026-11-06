@@ -34,9 +34,9 @@ jobs:
           s = deps.read_text()
           assert old in s, "Upstream Boost URL changed – inspect before patching"
           s = s.replace(old, new)
-          deps.write_text("set -e\\n" + s)
+          deps.write_text(s.replace("#!/bin/bash", "#!/bin/bash" + chr(10) + "set -e", 1))
           build = root / "build.sh"
-          build.write_text("set -e\\n" + build.read_text())
+          build.write_text(build.read_text().replace("#!/bin/bash", "#!/bin/bash" + chr(10) + "set -e", 1))
           print("Patched Boost URL:", new)
           PY
           curl -fIL --retry 3 --max-time 60 https://archives.boost.org/release/1.82.0/source/boost_1_82_0.tar.bz2
