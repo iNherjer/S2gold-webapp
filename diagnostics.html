@@ -3,7 +3,7 @@
 <title>S2Gold – Diagnose</title>
 <style>body{font:16px system-ui,-apple-system,sans-serif;background:#11251e;color:#edf4e9;max-width:720px;margin:0 auto;padding:20px;line-height:1.5}h1{font-size:1.5rem}button,a{font:inherit;display:inline-block;color:#162315;background:#e7c377;padding:11px 14px;border:0;border-radius:9px;margin:5px 3px 5px 0;text-decoration:none}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#253d31;padding:14px;border-radius:10px}small{color:#b6cbb9}</style></head>
 <body><h1>S2Gold – sichere Diagnose</h1><p>Diese Seite lädt <strong>keinen DOS-Emulator und keine Spiel-Dateien</strong>. Sie zeigt nur gespeicherte technische Startmeldungen. Das gespeicherte Spiel wird nicht gelöscht.</p>
-<div><button id="refresh">Daten neu lesen</button><button id="copy">Diagnose kopieren</button><button id="clear">Nur Diagnose löschen</button></div>
+<div><button id="storage">Lokalen Speicher prüfen</button><button id="refresh">Daten neu lesen</button><button id="copy">Diagnose kopieren</button><button id="clear">Nur Diagnose löschen</button></div>
 <pre id="output">Lese Diagnose …</pre>
 <p><a href="./?diagnose=1">Webplayer öffnen</a></p>
 <small>Hinweis: Ein Safari-Prozessabsturz kann ohne JavaScript-Fehlermeldung auftreten. Die letzte Phase ist ein Anhaltspunkt, keine eindeutige Absturzursache.</small>
@@ -16,10 +16,33 @@ try{data.lastPhase=JSON.parse(localStorage.getItem('s2gold-last-boot-phase')||'n
 try{data.trail=JSON.parse(localStorage.getItem('s2gold-trace-v1')||'[]');}catch(e){data.trailError=String(e);}
 try{data.lastError=localStorage.getItem('s2gold-last-error');}catch(e){}
 try{data.navigation=performance.getEntriesByType('navigation').map(n=>({type:n.type,duration:Math.round(n.duration)}));}catch(e){}
+try{data.importInventory=JSON.parse(localStorage.getItem('s2gold-last-import-inventory')||'null');}catch(e){data.importInventoryError=String(e);}
+
 out.textContent=JSON.stringify(data,null,2);
 return out.textContent;
 }
 document.getElementById('refresh').onclick=read;
+document.getElementById('storage').onclick=async()=>{
+const button=document.getElementById('storage');button.disabled=true;
+let result={time:new Date().toISOString(),opfsSupported:!!navigator.storage?.getDirectory};
+try{
+  const estimate=await navigator.storage.estimate();
+  result.estimatedUsageMiB=+(estimate.usage/1048576).toFixed(1);
+  result.estimatedQuotaMiB=+(estimate.quota/1048576).toFixed(1);
+}catch(e){result.estimateError=String(e);}
+try{
+  const root=await navigator.storage.getDirectory();result.opfsFiles=[];
+  for await(const [name,handle] of root.entries()){
+    if(handle.kind!=='file'){result.opfsFiles.push({name,kind:handle.kind});continue;}
+    try{
+      const f=await handle.getFile();
+      result.opfsFiles.push({name,kind:'file',sizeMiB:+(f.size/1048576).toFixed(1),modified:f.lastModified});
+    }catch(e){result.opfsFiles.push({name,error:String(e)});}
+  }
+}catch(e){result.opfsError=String(e);}
+out.textContent=read()+'\n\nLOKALER SPEICHER:\n'+JSON.stringify(result,null,2);
+button.disabled=false;
+};
 document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(read());alert('Diagnose kopiert.');}catch(e){out.textContent+='\nKopieren nicht möglich: '+e;}};
 document.getElementById('clear').onclick=()=>{if(confirm('Nur technische Diagnosemeldungen löschen? Die Spielinstallation bleibt erhalten.')){localStorage.removeItem('s2gold-trace-v1');localStorage.removeItem('s2gold-last-boot-phase');localStorage.removeItem('s2gold-last-error');read();}};
 read();
