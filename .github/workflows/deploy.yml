@@ -4,9 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  workflow_run:
-    workflows: ['Build Innoextract WebAssembly (experimental)']
-    types: [completed]
 
 permissions:
   contents: read
@@ -16,11 +13,10 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -29,35 +25,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Stage static frontend
-        shell: bash
         run: |
           set -euo pipefail
           mkdir -p site/extractor
           cp index.html installer-check.js updater.js sw.js version.json .nojekyll site/
-      - name: Download tested WASM build artifact
+          if test -f extractor/index.html; then cp extractor/index.html site/extractor/index.html; fi
+      - name: Try to bundle last validated extractor
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # Pinned known-good artifact so a failing experimental WASM build
+          # cannot break a normal Pages deployment.
+          RUN_ID=42251385007
           mkdir -p build-artifact
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            RUN_ID="${{ github.event.workflow_run.id }}"
+          if gh run download "$RUN_ID" --repo "${{ github.repository }}" --name innoextract-wasm-experimental --dir build-artifact \
+             && test -s build-artifact/innoextract.wasm \
+             && test -s build-artifact/innoextract.js \
+             && test -s build-artifact/index.html; then
+            cp build-artifact/innoextract.wasm build-artifact/innoextract.js build-artifact/index.html site/extractor/
+            if test -f build-artifact/innoextract.html; then cp build-artifact/innoextract.html site/extractor/; fi
+            for folder in js css img; do
+              if test -d "build-artifact/$folder"; then cp -R "build-artifact/$folder" site/extractor/; fi
+            done
+            echo "Validated extractor successfully included"
           else
-            RUN_ID=$(gh run list --repo "${{ github.repository }}" --workflow build-innoextract-wasm.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+            echo "::warning::Validated WASM artifact unavailable. Deploying website with diagnostic extractor page."
           fi
-          test -n "$RUN_ID"
-          echo "Using successful WASM build run: $RUN_ID"
-          gh run download "$RUN_ID" --repo "${{ github.repository }}" --name innoextract-wasm-experimental --dir build-artifact
-          test -s build-artifact/innoextract.wasm
-          test -s build-artifact/innoextract.js
-          test -s build-artifact/index.html
-          cp build-artifact/innoextract.wasm build-artifact/innoextract.js build-artifact/index.html build-artifact/innoextract.html site/extractor/
-          for folder in js css img; do
-            if test -d "build-artifact/$folder"; then cp -R "build-artifact/$folder" site/extractor/; fi
-          done
-          test -s site/extractor/innoextract.wasm
-          echo "Extractor browser assets staged successfully."
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload static site
