@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_run:
+    workflows: ['Build Innoextract WebAssembly (experimental)']
+    types: [completed]
 
 permissions:
   contents: read
@@ -17,6 +20,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -37,7 +41,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build-artifact
-          gh run download 42251385007 --repo "${{ github.repository }}" --name innoextract-wasm-experimental --dir build-artifact
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            RUN_ID="${{ github.event.workflow_run.id }}"
+          else
+            RUN_ID=$(gh run list --repo "${{ github.repository }}" --workflow build-innoextract-wasm.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          fi
+          test -n "$RUN_ID"
+          echo "Using successful WASM build run: $RUN_ID"
+          gh run download "$RUN_ID" --repo "${{ github.repository }}" --name innoextract-wasm-experimental --dir build-artifact
           test -s build-artifact/innoextract.wasm
           test -s build-artifact/innoextract.js
           test -s build-artifact/index.html
