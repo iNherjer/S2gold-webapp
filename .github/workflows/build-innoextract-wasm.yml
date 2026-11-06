@@ -41,6 +41,52 @@ jobs:
           PY
           curl -fIL --retry 3 --max-time 60 https://archives.boost.org/release/1.82.0/source/boost_1_82_0.tar.bz2
 
+      - name: Patch streaming ZIP export and preserve final buffer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("innoextract-wasm/src/wasm/emjs.cpp")
+          text = path.read_text()
+          old_close = """EM_JS(void, close_int, (void), {
+  if(Module.writer) {
+    Module.writer.close();
+    innoLog("zipstream: close")
+  }
+  else {
+    innoLog("writer.close() requested, but writer is not yet constructed")
+  }
+});"""
+          new_close = """EM_ASYNC_JS(void, close_int, (void), {
+  if (Module.writer) {
+    await Module.writer.close();
+    innoLog("zipstream: close completed");
+  } else {
+    throw new Error("ZIP writer missing during close");
+  }
+});"""
+          assert old_close in text, "Upstream close_int changed"
+          text = text.replace(old_close, new_close)
+          old_write = "let buff = new Uint8Array(Module.HEAPU8.buffer, ptr, size*n);"
+          assert old_write in text, "Upstream write_int changed"
+          text = text.replace(old_write, "let buff = new Uint8Array(Module.HEAPU8.buffer, ptr, size*n).slice();")
+          old_final = """void close() {
+  close_int();
+}"""
+          new_final = """void close() {
+  if (bpos > 0) {
+    write_int(buff, 1, bpos);
+    bpos = 0;
+  }
+  close_int();
+}"""
+          assert old_final in text, "Upstream close() changed"
+          text = text.replace(old_final, new_final)
+          path.write_text(text)
+          print("Patched: copy queued bytes; flush trailing ZIP block; await close.")
+          PY
+
       - name: Build browser target with upstream Dockerfile
         run: |
           docker build --progress=plain -t s2gold-innoextract-wasm ./innoextract-wasm
