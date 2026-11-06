@@ -60,10 +60,13 @@ const storeSupported=()=>!!navigator.storage?.getDirectory;
 async function storeBundle(bytes){
   if(!storeSupported())throw Error('Lokaler Browserspeicher (OPFS) nicht verfügbar.');
   traceBoot('opfs-begin-'+(bytes.length/1048576).toFixed(1)+'MiB');
-  const limit=(promise,ms,label)=>Promise.race([
-    promise,
-    new Promise((_,reject)=>setTimeout(()=>reject(new Error(label+' nach '+Math.round(ms/1000)+' s ohne Abschluss')),ms))
-  ]);
+  const limit=(promise,ms,label)=>{
+    let timeoutId;
+    return Promise.race([
+      promise,
+      new Promise((_,reject)=>{timeoutId=setTimeout(()=>reject(new Error(label+' nach '+Math.round(ms/1000)+' s ohne Abschluss')),ms);})
+    ]).finally(()=>clearTimeout(timeoutId));
+  };
   const root=await limit(navigator.storage.getDirectory(),15000,'OPFS getDirectory');
   traceBoot('opfs-root-ready');
   const handle=await limit(root.getFileHandle(SAVE_FILE,{create:true}),15000,'OPFS getFileHandle');
