@@ -81,7 +81,7 @@ jobs:
           s, changes = re.subn(r"void close\(\)\s*\{\s*close_int\(\);\s*\}", lambda _: replacement, s, count=1)
           assert changes == 1, "Close implementation changed upstream"
           needle2 = "  bpos = 0; // Reset output buffer"
-          replace2 = "  bpos = 0; // Reset output buffer\\n  EM_ASM({ Module.zipQueue = Promise.resolve(); Module.zipError = null; });"
+          replace2 = needle2 + chr(10) + "  EM_ASM({ Module.zipQueue = Promise.resolve(); Module.zipError = null; });"
           assert needle2 in s
           s = s.replace(needle2, replace2, 1)
           p.write_text(s)
