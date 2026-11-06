@@ -1,0 +1,44 @@
+name: Build Innoextract WebAssembly (experimental)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-innoextract-wasm.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout upstream WASM port
+        uses: actions/checkout@v4
+        with:
+          repository: Mobica/innoextract-wasm
+          ref: wasm-main
+          path: innoextract-wasm
+
+      - name: Build browser target with upstream Dockerfile
+        run: |
+          docker build --progress=plain -t s2gold-innoextract-wasm ./innoextract-wasm
+
+      - name: Copy generated browser distribution
+        run: |
+          id=$(docker create s2gold-innoextract-wasm)
+          mkdir -p dist/innoextract
+          docker cp "$id:/root/innoextract/build/." dist/innoextract/
+          docker rm "$id"
+          echo "Output files:"
+          find dist/innoextract -maxdepth 2 -type f -printf '%p %s bytes\n'
+          test -s dist/innoextract/innoextract.wasm
+          test -s dist/innoextract/innoextract.js
+
+      - name: Archive compiled browser runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: innoextract-wasm-experimental
+          path: dist/innoextract/
+          retention-days: 14
