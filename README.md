@@ -9,6 +9,12 @@ Experimenteller Browser-Webplayer für **Siedler II Gold** mit js-dos 8 und iPad
 - Die Spielinstallation wird noch nicht dauerhaft im Browser gespeichert.
 - Keine Originalspieldateien im Repository ablegen.
 
+## Updates und Safari-Cache
+- Service Worker `sw.js` v0.3.0: Navigationen und `version.json` sind network-first, nur kleine Shell-Dateien werden gecacht. Keine GOG-Dateien werden im Service-Worker-Cache gespeichert.
+- `updater.js` fragt `version.json` ohne Browsercache ab und bietet „Update laden“ an. Vor einem Reload Spielstände sichern.
+- Die erstmalige Migration einer älteren, von Safari zwischengespeicherten Seite kann den einmaligen Aufruf mit `?refresh=1` oder ein neues Laden der Seite erfordern.
+- Jede neue Veröffentlichung erfordert eine erhöhte Versionsnummer in `version.json`, `sw.js`, `updater.js`, dem HTML-Badge und dessen Skript-URLs. 
+
 ## GitHub Pages
 Repository > Settings > Pages > Build and deployment > Deploy from a branch > main > /(root).
 
