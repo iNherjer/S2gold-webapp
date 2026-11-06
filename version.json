@@ -1,5 +1,5 @@
 {
-  "version": "0.4.9",
+  "version": "0.5.0",
   "released": "2026-11-06",
-  "notes": "Block 295 MiB in-RAM emulator launches and record OPFS save/restore errors in diagnostics"
+  "notes": "Storage and file inventory diagnostics before optimizing huge DOS bundles"
 }
