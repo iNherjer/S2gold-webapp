@@ -1,8 +1,8 @@
-/* S2gold-webapp service worker v0.4.6
+/* S2gold-webapp service worker v0.4.7
  * Scope: this GitHub Pages project only.
  * No caching of GOG EXE, ZIP archives, WASM, or third-party emulator resources.
  */
-const VERSION = '0.4.6';
+const VERSION = '0.4.7';
 const CACHE_NAME = 's2gold-shell-' + VERSION;
 const SHELL = ['./', './index.html', './installer-check.js?v=' + VERSION, './updater.js?v=' + VERSION, './version.json'];
 self.addEventListener('install', event => {
