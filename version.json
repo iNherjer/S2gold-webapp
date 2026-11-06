@@ -1,5 +1,5 @@
 {
-  "version": "0.4.7",
+  "version": "0.4.8",
   "released": "2026-11-06",
-  "notes": "Load saved js-dos bundle via local blob URL and log startup phase across page reloads"
+  "notes": "Standalone crash diagnostics page and persistent startup trace; no game assets loaded in diagnostics"
 }
