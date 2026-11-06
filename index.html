@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#14291f">
+<title>Siedler II Gold – iPad Webplayer</title>
+<link rel="stylesheet" href="https://v8.js-dos.com/latest/js-dos.css">
+<style>
+:root{font-family:system-ui,-apple-system,sans-serif;color-scheme:dark;background:#10241c;color:#f1eddf}
+*{box-sizing:border-box}body{margin:0}header{padding:14px 18px;background:#1c392b;border-bottom:1px solid #597159}h1{font-size:1.2rem;margin:0}main{max-width:1200px;margin:auto;padding:12px}p{line-height:1.45}
+.panel{background:#1e3c2b;border:1px solid #54705b;border-radius:14px;padding:12px;margin-bottom:10px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}button,.upload{border:1px solid #889c7a;border-radius:10px;padding:10px 13px;background:#36563b;color:#fff;font:inherit;touch-action:manipulation;cursor:pointer}
+button:disabled{opacity:.45}.primary{background:#d3b36c;color:#12241a;font-weight:bold}.upload input{display:none}
+#stage{position:relative;background:#070d09;aspect-ratio:4/3;max-height:70dvh;margin:auto;border-radius:10px;overflow:hidden;touch-action:none}
+#dos,#dos>div{width:100%;height:100%}#touch{position:absolute;inset:0;touch-action:none;z-index:5;display:none}
+#status{white-space:pre-wrap;color:#e8cd85;font-size:13px;min-height:2em;margin:10px 0}small{color:#b3c9b8}
+@media(orientation:landscape){main{max-width:100%;padding:7px}#stage{max-height:63dvh}}
+</style></head><body>
+<header><h1>🏝 Siedler II Gold · iPad Touch Webplayer <small>Experiment v0.1</small></h1></header>
+<main><section class="panel"><p>Lokale Spieldateien auswählen (ZIP der <strong>installierten DOS-Version</strong>). Die GOG-Installer-EXE wird in dieser Version <strong>noch nicht</strong> entpackt. Es werden keine Spieldateien hochgeladen.</p>
+<div class="controls"><label class="upload">📂 Spiel-ZIP<input id="file" type="file" accept=".zip,.jsdos"></label><button class="primary" id="start" disabled>Spiel starten</button><button id="demo">DOS-Test</button><button id="fullscreen">Vollbild</button></div><p id="status" role="status">Bereit. Bitte zuerst „DOS-Test“ ausprobieren.</p></section>
+<div id="stage"><div id="dos"></div><div id="touch"></div></div>
+<section class="panel"><div class="controls"><button data-mouse="0" disabled>Linksklick</button><button data-mouse="2" disabled>Rechtsklick</button><button data-key="256" disabled>Esc</button><button data-key="257" disabled>Enter</button><button data-key="263" disabled>←</button><button data-key="265" disabled>↑</button><button data-key="264" disabled>↓</button><button data-key="262" disabled>→</button><button id="save" disabled>Spielstand sichern</button></div>
+<p><small>Touch-Prototyp: Tippen = linker Mausklick; Drag = Maus bewegen. Die Steuerung und Speicherschnittstelle müssen noch auf dem iPad getestet werden. Für spätere Versionen: direkter GOG-Inno-Setup-Import und lokales Speichern der Installation.</small></p></section></main>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://v8.js-dos.com/latest/js-dos.js"></script>
+<script>
+(()=>{const $=s=>document.querySelector(s),status=t=>$('#status').textContent=t;
+let zipBytes=null,launch='',player=null,ci=null,pressed=false;
+function config(cmd){return '[sdl]\nfullscreen=false\n[dosbox]\nmachine=svga_s3\nmemsize=32\n[cpu]\ncore=auto\ncycles=auto\n[autoexec]\n@echo off\nc:\n'+cmd+'\n';}
+$('#file').addEventListener('change',async ev=>{let file=ev.target.files[0];if(!file)return;try{
+status('ZIP wird lokal gelesen …');const source=await JSZip.loadAsync(file);
+const names=Object.keys(source.files).filter(n=>!source.files[n].dir);
+const exe=names.find(n=>/(^|\/)(SIEDLER2|SETTLER2|S2)\.EXE$/i.test(n));
+if(!exe)throw Error('Keine S2.EXE / SIEDLER2.EXE / SETTLER2.EXE gefunden. Bitte die installierten DOS-Dateien zippen.');
+const prefix=exe.substring(0,exe.lastIndexOf('/')+1),out=new JSZip();let count=0;
+for(const name of names){if(!name.startsWith(prefix))continue;const relative=name.slice(prefix.length);if(!relative||relative.startsWith('.jsdos/'))continue;out.file(relative,source.files[name].async('uint8array'));count++;}
+zipBytes=new Uint8Array(await out.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:1}}));launch=exe.slice(prefix.length).replaceAll('/','\\');$('#start').disabled=false;
+status(count+' Dateien gefunden. Bereit für „Spiel starten“.');
+}catch(e){zipBytes=null;$('#start').disabled=true;status('Importfehler: '+e.message);}});
+async function boot(demo){try{if(player){await player.stop();player=null;ci=null;}$('#dos').replaceChildren();$('#touch').style.display='none';status('DOSBox startet …');
+player=Dos($('#dos'),{dosboxConf:config(demo?'ver':launch),autoStart:true,backend:'dosbox',backendLocked:true,renderAspect:'4/3',imageRendering:'pixelated',mouseCapture:false,workerThread:true,autoSave:true,initFs:demo?undefined:zipBytes,onEvent:(event,arg)=>{if(event==='ci-ready'){ci=arg;document.querySelectorAll('[data-mouse],[data-key],#save').forEach(b=>b.disabled=false);$('#touch').style.display='block';status(demo?'DOS-Test läuft.':'Emulator läuft – Spielstart wird geprüft.');}}});
+}catch(e){status('Startfehler: '+e.message);}}
+$('#demo').onclick=()=>boot(true);$('#start').onclick=()=>boot(false);
+$('#fullscreen').onclick=()=>{const el=$('#stage');if(el.requestFullscreen)el.requestFullscreen().catch(e=>status(e.message));else status('Vollbild wird hier nicht unterstützt.');};
+function move(ev){const r=$('#touch').getBoundingClientRect();return{x:Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(ev.clientY-r.top)/r.height))};}
+async function mouse(ev){if(!ci)return;const p=move(ev);try{await ci.sendMouseMotion(p.x,p.y)}catch(e){status('Mauseingabe: '+e.message);}}
+const touch=$('#touch');touch.addEventListener('pointerdown',async e=>{e.preventDefault();touch.setPointerCapture(e.pointerId);pressed=true;await mouse(e);try{await ci.sendMouseButton(0,true)}catch(err){status(err.message)}});
+touch.addEventListener('pointermove',e=>{if(pressed){e.preventDefault();mouse(e)}});
+for(const type of ['pointerup','pointercancel'])touch.addEventListener(type,async e=>{if(!pressed||!ci)return;pressed=false;await mouse(e);try{await ci.sendMouseButton(0,false)}catch(err){status(err.message)}});
+document.querySelectorAll('[data-mouse]').forEach(b=>b.onclick=async()=>{if(!ci)return;const n=Number(b.dataset.mouse);try{await ci.sendMouseButton(n,true);await ci.sendMouseButton(n,false)}catch(e){status(e.message)}});
+document.querySelectorAll('[data-key]').forEach(b=>b.onclick=async()=>{if(!ci)return;const k=Number(b.dataset.key);try{await ci.sendKeyEvent(k,true);await ci.sendKeyEvent(k,false)}catch(e){status(e.message)}});
+$('#save').onclick=async()=>{if(!ci)return;try{await ci.persist();status('Speicheranfrage gesendet. Wiederherstellung noch nicht verifiziert.')}catch(e){status('Speicherfehler: '+e.message)}};
+})();
+</script></body></html>
