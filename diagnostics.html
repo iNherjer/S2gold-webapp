@@ -43,7 +43,7 @@ try{
 out.textContent=read()+'\n\nLOKALER SPEICHER:\n'+JSON.stringify(result,null,2);
 button.disabled=false;
 };
-document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(read());alert('Diagnose kopiert.');}catch(e){out.textContent+='\nKopieren nicht möglich: '+e;}};
+document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(out.textContent);alert('Diagnose kopiert.');}catch(e){out.textContent+='\nKopieren nicht möglich: '+e;}};
 document.getElementById('clear').onclick=()=>{if(confirm('Nur technische Diagnosemeldungen löschen? Die Spielinstallation bleibt erhalten.')){localStorage.removeItem('s2gold-trace-v1');localStorage.removeItem('s2gold-last-boot-phase');localStorage.removeItem('s2gold-last-error');read();}};
 read();
 })();
