@@ -13,14 +13,14 @@ button:disabled{opacity:.45}.primary{background:#d3b36c;color:#12241a;font-weigh
 #status{white-space:pre-wrap;color:#e8cd85;font-size:13px;min-height:2em;margin:10px 0}small{color:#b3c9b8}
 @media(orientation:landscape){main{max-width:100%;padding:7px}#stage{max-height:63dvh}}
 </style></head><body>
-<header><h1>🏝 Siedler II Gold · iPad Touch Webplayer <small>Experiment v0.5.0</small></h1></header>
+<header><h1>🏝 Siedler II Gold · iPad Touch Webplayer <small>Experiment v0.5.1</small></h1></header>
 <main><section class="panel"><p>Lokale Spieldateien auswählen (ZIP der <strong>installierten DOS-Version</strong>). Die direkte EXE-Extraktion ist jetzt <strong>auf einer separaten Testseite</strong> verfügbar, jedoch noch nicht mit dem Spielstart verbunden. Es werden keine Spieldateien hochgeladen.</p>
-<div class="controls"><label class="upload">📂 Spiel-ZIP<input id="file" type="file" accept=".zip,.jsdos"></label><button id="forget" disabled>Gespeichertes Spiel löschen</button><label class="upload">🔍 GOG-Installer prüfen<input id="installer" type="file" accept=".exe,application/octet-stream"></label><button class="primary" id="start" disabled>Spiel starten</button><label style="display:inline-flex;gap:7px;align-items:center">Engine: <select id="engine" style="background:#36563b;color:white;border:1px solid #889c7a;border-radius:9px;padding:10px"><option value="dosboxX">DOSBox-X (Test)</option><option value="dosbox">DOSBox (bisher)</option></select></label><button id="demo">DOS-Test</button><a href="./diagnostics.html" style="color:#ffe5a0;padding:10px">🩺 Diagnose & Speichercheck</a><button id="fullscreen">Vollbild</button><button id="checkUpdate">↻ Updates prüfen</button><button id="extractorTest">🧪 EXE-Extractor testen</button></div><p id="updateStatus" role="status"><small>Webplayer v0.5.0 – Updateprüfung wird vorbereitet.</small></p><p id="status" role="status">Bereit. Bitte zuerst „DOS-Test“ ausprobieren.</p></section>
+<div class="controls"><label class="upload">📂 Spiel-ZIP<input id="file" type="file" accept=".zip,.jsdos"></label><button id="forget" disabled>Gespeichertes Spiel löschen</button><label class="upload">🔍 GOG-Installer prüfen<input id="installer" type="file" accept=".exe,application/octet-stream"></label><button class="primary" id="start" disabled>Spiel starten</button><label style="display:inline-flex;gap:7px;align-items:center">Engine: <select id="engine" style="background:#36563b;color:white;border:1px solid #889c7a;border-radius:9px;padding:10px"><option value="dosboxX">DOSBox-X (Test)</option><option value="dosbox">DOSBox (bisher)</option></select></label><button id="demo">DOS-Test</button><a href="./diagnostics.html" style="color:#ffe5a0;padding:10px">🩺 Diagnose & Speichercheck</a><button id="fullscreen">Vollbild</button><button id="checkUpdate">↻ Updates prüfen</button><button id="extractorTest">🧪 EXE-Extractor testen</button></div><p id="updateStatus" role="status"><small>Webplayer v0.5.1 – Updateprüfung wird vorbereitet.</small></p><p id="status" role="status">Bereit. Bitte zuerst „DOS-Test“ ausprobieren.</p></section>
 <div id="stage"><div id="dos"></div><div id="touch"></div></div>
 <section class="panel"><div class="controls"><button data-mouse="0" disabled>Linksklick</button><button data-mouse="2" disabled>Rechtsklick</button><button data-key="256" disabled>Esc</button><button data-key="257" disabled>Enter</button><button data-key="263" disabled>←</button><button data-key="265" disabled>↑</button><button data-key="264" disabled>↓</button><button data-key="262" disabled>→</button><button id="save" disabled>Spielstand sichern</button></div>
 <p><small>Touch-Prototyp: Tippen = linker Mausklick; Drag = Maus bewegen. Die Steuerung und Speicherschnittstelle müssen noch auf dem iPad getestet werden. Für spätere Versionen: direkter GOG-Inno-Setup-Import und lokales Speichern der Installation.</small></p></section></main>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="./installer-check.js?v=0.5.0"></script>
+<script src="./installer-check.js?v=0.5.1"></script>
 <script src="https://v8.js-dos.com/latest/js-dos.js"></script>
 <script>
 (()=>{const $=s=>document.querySelector(s),status=t=>$('#status').textContent=t;
@@ -58,20 +58,53 @@ document.addEventListener('visibilitychange',()=>traceBoot('visibility-'+documen
 
 const storeSupported=()=>!!navigator.storage?.getDirectory;
 async function storeBundle(bytes){
-  if(!storeSupported())throw Error('Lokaler Browserspeicher nicht verfügbar.');
-  const root=await navigator.storage.getDirectory();
-  const handle=await root.getFileHandle(SAVE_FILE,{create:true});
-  const writable=await handle.createWritable();
+  if(!storeSupported())throw Error('Lokaler Browserspeicher (OPFS) nicht verfügbar.');
+  traceBoot('opfs-begin-'+(bytes.length/1048576).toFixed(1)+'MiB');
+  const limit=(promise,ms,label)=>Promise.race([
+    promise,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error(label+' nach '+Math.round(ms/1000)+' s ohne Abschluss')),ms))
+  ]);
+  const root=await limit(navigator.storage.getDirectory(),15000,'OPFS getDirectory');
+  traceBoot('opfs-root-ready');
+  const handle=await limit(root.getFileHandle(SAVE_FILE,{create:true}),15000,'OPFS getFileHandle');
+  traceBoot('opfs-file-ready');
+  const writable=await limit(handle.createWritable(),20000,'OPFS createWritable');
+  traceBoot('opfs-writer-ready');
   try{
-    const part=2*1024*1024;
+    const part=1024*1024;
+    const startTime=performance.now();
+    let lastTrace=0;
     for(let offset=0;offset<bytes.length;offset+=part){
-      await writable.write(bytes.subarray(offset,Math.min(bytes.length,offset+part)));
+      const index=Math.floor(offset/part)+1;
+      const end=Math.min(bytes.length,offset+part);
+      const currentSize=end-offset;
+      const t=performance.now();
+      status('Speichere Spiel lokal: '+(end/1048576).toFixed(0)+' / '+(bytes.length/1048576).toFixed(0)+' MiB ('+Math.round(end*100/bytes.length)+' %) – Block '+index+' …');
+      if(offset===0||offset-lastTrace>=16*part){
+        traceBoot('opfs-writing-'+(offset/1048576).toFixed(0)+'MiB');
+        lastTrace=offset;
+      }
+      await limit(writable.write(bytes.subarray(offset,end)),20000,'OPFS write Block '+index);
+      if(offset===0||offset-lastTrace>=16*part)traceBoot('opfs-written-'+(end/1048576).toFixed(0)+'MiB');
+      if(performance.now()-t>5000)traceBoot('opfs-slow-write-'+index+'-'+Math.round(performance.now()-t)+'ms');
+      // Allow Safari to paint progress between file writes.
+      if(index%4===0)await new Promise(resolve=>setTimeout(resolve,0));
     }
-    await writable.close();
+    traceBoot('opfs-closing');
+    status('Speichern: Alle '+(bytes.length/1048576).toFixed(0)+' MiB geschrieben. Schließe Datei …');
+    await limit(writable.close(),45000,'OPFS close');
+    traceBoot('opfs-closed-'+Math.round(performance.now()-startTime)+'ms');
+    const saved=await limit(handle.getFile(),15000,'OPFS getFile after save');
+    if(saved.size!==bytes.length)throw Error('Gespeicherte Datei unvollständig: '+saved.size+' statt '+bytes.length+' Byte');
     $('#forget').disabled=false;
     savedBundleAvailable=true;
     traceBoot('opfs-save-success-'+(bytes.length/1048576).toFixed(1)+'MiB');
-  }catch(error){traceBoot('opfs-save-failed: '+error.name+': '+error.message);try{await writable.abort();}catch{}throw error;}
+  }catch(error){
+    traceBoot('opfs-save-failed: '+error.name+': '+error.message);
+    // Do not wait indefinitely for abort() if Safari's storage subsystem is stuck.
+    try{void writable.abort().catch(()=>{});}catch{}
+    throw error;
+  }
 }
 async function restoreBundle(){
   if(!storeSupported()){status('Lokale Speicherung nicht unterstützt. ZIP bitte auswählen.');return;}
@@ -142,7 +175,7 @@ const launchCmd=launch.toUpperCase();
 const diagnosticBat=[
   '@ECHO OFF',
   'ECHO =====================================',
-  'ECHO S2Gold DOS-Startdiagnose v0.5.0',
+  'ECHO S2Gold DOS-Startdiagnose v0.5.1',
   'ECHO =====================================',
   'C:',
   'CD \\',
@@ -262,4 +295,4 @@ traceBoot('page-script-ready');
 restoreBundle().then(()=>traceBoot('opfs-metadata-done'),e=>traceBoot('opfs-metadata-error: '+e.message));
 $('#save').onclick=async()=>{if(!ci)return;try{await ci.persist();status('Speicheranfrage gesendet. Wiederherstellung noch nicht verifiziert.')}catch(e){status('Speicherfehler: '+e.message)}};
 })();
-</script><script src="./updater.js?v=0.5.0"></script><script>document.getElementById('extractorTest').addEventListener('click',()=>{window.location.href='./extractor/index.html';});</script></body></html>
+</script><script src="./updater.js?v=0.5.1"></script><script>document.getElementById('extractorTest').addEventListener('click',()=>{window.location.href='./extractor/index.html';});</script></body></html>
